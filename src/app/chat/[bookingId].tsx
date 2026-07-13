@@ -15,17 +15,17 @@ import * as ImagePicker from 'expo-image-picker';
 import Screen from '@/components/Screen';
 import ErrorState from '@/components/ErrorState';
 import ChatBubble from '@/components/ChatBubble';
-import BandPickerModal from '@/components/BandPickerModal';
+import DefineBookingModal from '@/components/DefineBookingModal';
 import BookingRequestBar from '@/components/BookingRequestBar';
 import ConfirmBookingModal from '@/components/ConfirmBookingModal';
 import { useChatMessages, useSendChat } from '@/hooks/useChat';
 import { useBooking, useUpdateBookingStatus } from '@/hooks/useBookings';
-import { useReserveSlot, useReleaseSlot } from '@/hooks/useSlots';
+import { useReserveSlot, useReserveInterval, useReleaseSlot } from '@/hooks/useSlots';
 import { SlotConflictError } from '@/api/slots';
 import { isPending, isConfirmed, STATUS_APPROVE, STATUS_REJECT } from '@/api/bookings';
 import { parseBookingIntent } from '@/lib/bookingIntent';
 import type { ChatMessage } from '@/api/chat';
-import { BAND_LABELS, BAND_TIME_LABELS, type Band } from '@/api/calendar';
+import { BAND_LABELS, BAND_TIME_LABELS, BAND_HOURS, bandFromNotes, type Band } from '@/api/calendar';
 
 const REJECT_MESSAGE =
   'ご連絡ありがとうございます。申し訳ございませんが、ご希望の日程は現在空きがございません。別の日程をご検討いただけますと幸いです。';
@@ -50,7 +50,7 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [text, setText] = useState('');
-  const [approving, setApproving] = useState(false);
+  const [defining, setDefining] = useState(false);
   const [intent, setIntent] = useState<{ date: string; band: Band | null } | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useChatMessages(bookingId);
@@ -60,8 +60,10 @@ export default function ChatRoomScreen() {
   const booking = useBooking(bookingId);
   const statusMut = useUpdateBookingStatus();
   const reserveMut = useReserveSlot();
+  const intervalMut = useReserveInterval();
   const releaseMut = useReleaseSlot();
-  const actionBusy = statusMut.isPending || reserveMut.isPending || releaseMut.isPending;
+  const actionBusy =
+    statusMut.isPending || reserveMut.isPending || intervalMut.isPending || releaseMut.isPending;
 
   const bookingDate = booking.data
     ? (booking.data.booking_date || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || ''
@@ -126,27 +128,41 @@ export default function ChatRoomScreen() {
     send.mutate({ images: [{ uri: a.uri, name: fileName, mime }] }, { onError: onSendError });
   }
 
-  // ── Approve: pick a band → reserve the slot (collision-checked) → 確定 ──────
+  // ── Approve → "Define Booking": admin sets start + duration; an interval
+  //    collision check reserves the exact window. (Requires the hourly backend.)
   function onApprove() {
     if (!bookingDate) {
       Alert.alert('日付が必要', '予約日が設定されていません。詳細画面から日付を設定してください。');
       return;
     }
-    setApproving(true);
+    setDefining(true);
   }
 
-  function confirmWithBand(band: Band) {
-    reserveMut.mutate(
-      { bookingId, date: bookingDate, band },
+  // Default the start time to the requested band's start (else 09:00).
+  const defaultStartMinutes = (() => {
+    const band = booking.data ? bandFromNotes(booking.data.notes) : null;
+    return band ? BAND_HOURS[band].start * 60 : 9 * 60;
+  })();
+
+  function onDefineConfirm(startIso: string, endIso: string) {
+    intervalMut.mutate(
+      { bookingId, start: startIso, end: endIso },
       {
-        onSuccess: () =>
-          statusMut.mutate(
-            { id: bookingId, status: STATUS_APPROVE },
-            { onSettled: () => setApproving(false) },
-          ),
+        onSuccess: () => {
+          statusMut.mutate({ id: bookingId, status: STATUS_APPROVE });
+          const st = startIso.slice(11, 16);
+          const en = endIso.slice(11, 16);
+          send.mutate({
+            text: `【ご予約確定】${bookingDate} ${st}〜${en} でご予約を承りました。よろしくお願いいたします。`,
+          });
+          setDefining(false);
+        },
         onError: (e) => {
           if (e instanceof SlotConflictError) {
-            Alert.alert('Time Slot Occupied', 'Please release the slot first.\nこの時間帯は既に予約されています。');
+            Alert.alert(
+              '時間が重複しています',
+              `${e.conflictName || '既存の予約'} と重複しています。時間を調整してください。`,
+            );
           } else {
             Alert.alert('エラー', e instanceof Error ? e.message : '予約に失敗しました');
           }
@@ -256,13 +272,14 @@ export default function ChatRoomScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {approving && booking.data ? (
-        <BandPickerModal
+      {defining && booking.data ? (
+        <DefineBookingModal
           date={bookingDate}
-          title="承認：時間帯を選択"
-          busy={reserveMut.isPending || statusMut.isPending}
-          onPick={confirmWithBand}
-          onClose={() => setApproving(false)}
+          defaultStartMinutes={defaultStartMinutes}
+          customerName={name}
+          busy={intervalMut.isPending || statusMut.isPending}
+          onConfirm={onDefineConfirm}
+          onClose={() => setDefining(false)}
         />
       ) : null}
 
