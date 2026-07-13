@@ -39,17 +39,18 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: '#9ca3af',
       }}
     >
+      {/* Chat-First: the conversation list is the anchor (index / home). */}
       <Tabs.Screen
         name="index"
-        options={{ title: 'ホーム', tabBarIcon: ({ color }) => <TabIcon glyph="🏠" color={color} /> }}
+        options={{ title: 'チャット', tabBarIcon: ({ color }) => <TabIcon glyph="💬" color={color} /> }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{ title: '予約管理', tabBarIcon: ({ color }) => <TabIcon glyph="🏠" color={color} /> }}
       />
       <Tabs.Screen
         name="calendar"
         options={{ title: 'カレンダー', tabBarIcon: ({ color }) => <TabIcon glyph="📅" color={color} /> }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{ title: 'チャット', tabBarIcon: ({ color }) => <TabIcon glyph="💬" color={color} /> }}
       />
       <Tabs.Screen
         name="settings"
