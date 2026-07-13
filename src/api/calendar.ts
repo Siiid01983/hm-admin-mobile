@@ -20,6 +20,14 @@ export const BAND_LABELS: Record<Band, string> = {
   nt: '夜間',
 };
 
+// Canonical band time windows (mirror hm-api/_slots.php hm_slot_band_label).
+export const BAND_TIME_LABELS: Record<Band, string> = {
+  am: '9:00〜12:00',
+  pm: '12:00〜15:00',
+  ev: '15:00〜18:00',
+  nt: '18:00〜21:00',
+};
+
 // availability.php and block-slot.php use their OWN envelopes (not rest.php's
 // { ok, data, error }) — model each precisely.
 interface AvailabilityResponse {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import Screen from '@/components/Screen';
 import MonthCalendar from '@/components/MonthCalendar';
 import ErrorState from '@/components/ErrorState';
@@ -21,6 +22,7 @@ const STATE_META: Record<BandState, { label: string; chip: string; text: string 
 // Calendar tab — pick a day, see per-band availability, and block/unblock bands.
 // Real customer bookings ('booked') are read-only; only admin blocks are toggled.
 export default function CalendarScreen() {
+  const router = useRouter();
   const [date, setDate] = useState(todayIso);
   const { data, isLoading, isError, error, refetch } = useDayAvailability(date);
   const toggle = useToggleBlock(date);
@@ -100,6 +102,13 @@ export default function CalendarScreen() {
             ) : null}
           </View>
         )}
+
+        <Pressable
+          onPress={() => router.push(`/calendar/day-view?date=${date}` as Href)}
+          className="mt-5 bg-brand rounded-xl py-3 items-center active:opacity-80"
+        >
+          <Text className="text-white font-semibold">この日を詳しく（日程調整）→</Text>
+        </Pressable>
       </ScrollView>
     </Screen>
   );
