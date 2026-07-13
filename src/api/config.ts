@@ -1,5 +1,7 @@
 // Base URL of the existing self-hosted PHP API (same backend as the website).
-export const API_BASE = 'https://hello-moving.com/hm-api';
+// Sourced from EXPO_PUBLIC_API_URL when set (e.g. to target staging), falling
+// back to production. Only EXPO_PUBLIC_* vars are exposed to the app bundle.
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://hello-moving.com/hm-api';
 
 // PUBLIC client API key — identical to the website's window.API_KEY. It is a
 // bot/abuse deterrent that already ships to every browser (NOT user
