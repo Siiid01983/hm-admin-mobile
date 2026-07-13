@@ -17,16 +17,24 @@ import ErrorState from '@/components/ErrorState';
 import ChatBubble from '@/components/ChatBubble';
 import BandPickerModal from '@/components/BandPickerModal';
 import BookingRequestBar from '@/components/BookingRequestBar';
+import ConfirmBookingModal from '@/components/ConfirmBookingModal';
 import { useChatMessages, useSendChat } from '@/hooks/useChat';
 import { useBooking, useUpdateBookingStatus } from '@/hooks/useBookings';
 import { useReserveSlot, useReleaseSlot } from '@/hooks/useSlots';
 import { SlotConflictError } from '@/api/slots';
-import { isPending, STATUS_APPROVE, STATUS_REJECT } from '@/api/bookings';
+import { isPending, isConfirmed, STATUS_APPROVE, STATUS_REJECT } from '@/api/bookings';
+import { parseBookingIntent } from '@/lib/bookingIntent';
 import type { ChatMessage } from '@/api/chat';
-import type { Band } from '@/api/calendar';
+import { BAND_LABELS, BAND_TIME_LABELS, type Band } from '@/api/calendar';
 
 const REJECT_MESSAGE =
   'ご連絡ありがとうございます。申し訳ございませんが、ご希望の日程は現在空きがございません。別の日程をご検討いただけますと幸いです。';
+
+function todayIso(): string {
+  const d = new Date();
+  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 // One booking's chat room — the Conversation-Driven hub. Replies thread to
 // 'chat:<bookingId>'. When the room's booking is still pending, an in-chat
@@ -43,6 +51,7 @@ export default function ChatRoomScreen() {
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [text, setText] = useState('');
   const [approving, setApproving] = useState(false);
+  const [intent, setIntent] = useState<{ date: string; band: Band | null } | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useChatMessages(bookingId);
   const send = useSendChat(bookingId, { ref, customerEmail: email });
@@ -57,7 +66,6 @@ export default function ChatRoomScreen() {
   const bookingDate = booking.data
     ? (booking.data.booking_date || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || ''
     : '';
-  const showRequestBar = !!booking.data && isPending(booking.data.status);
 
   function onSendError(e: unknown) {
     Alert.alert('送信失敗', e instanceof Error ? e.message : '送信に失敗しました');
@@ -66,8 +74,41 @@ export default function ChatRoomScreen() {
   function onSendText() {
     const t = text.trim();
     if (!t || send.isPending) return;
+    // Chat-to-Booking: a command like "Book 7/20 at 9" opens the Confirm modal
+    // (pre-filled) instead of being sent as a chat message.
+    const parsed = parseBookingIntent(t);
+    if (parsed.isBooking) {
+      setIntent({ date: parsed.date || bookingDate || todayIso(), band: parsed.band ?? null });
+      setText('');
+      return;
+    }
     setText('');
     send.mutate({ text: t }, { onError: onSendError });
+  }
+
+  // Confirm the parsed booking → reserve the slot → 確定 → notify the client.
+  function onConfirmBooking(band: Band) {
+    if (!intent) return;
+    const d = intent.date;
+    reserveMut.mutate(
+      { bookingId, date: d, band },
+      {
+        onSuccess: () => {
+          statusMut.mutate({ id: bookingId, status: STATUS_APPROVE });
+          send.mutate({
+            text: `【ご予約確定】${d} ${BAND_LABELS[band]}（${BAND_TIME_LABELS[band]}）でご予約を承りました。よろしくお願いいたします。`,
+          });
+          setIntent(null);
+        },
+        onError: (e) => {
+          if (e instanceof SlotConflictError) {
+            Alert.alert('Time Slot Occupied', 'Please release the slot first.\nこの時間帯は既に予約されています。');
+          } else {
+            Alert.alert('エラー', e instanceof Error ? e.message : '予約に失敗しました');
+          }
+        },
+      },
+    );
   }
 
   async function onAttach() {
@@ -162,13 +203,21 @@ export default function ChatRoomScreen() {
               <Text className="text-center text-neutral-400 mt-10">まだメッセージはありません。</Text>
             }
             ListFooterComponent={
-              showRequestBar && booking.data ? (
-                <BookingRequestBar
-                  booking={booking.data}
-                  busy={actionBusy}
-                  onApprove={onApprove}
-                  onReject={onReject}
-                />
+              booking.data ? (
+                isPending(booking.data.status) ? (
+                  <BookingRequestBar
+                    booking={booking.data}
+                    busy={actionBusy}
+                    onApprove={onApprove}
+                    onReject={onReject}
+                  />
+                ) : isConfirmed(booking.data.status) ? (
+                  <View className="mx-3 my-2 bg-green-50 border border-green-200 rounded-2xl p-3">
+                    <Text className="text-xs font-semibold text-green-800">
+                      ✓ この予約は確定済みです（{booking.data.booking_date || ''}）
+                    </Text>
+                  </View>
+                ) : null
               ) : null
             }
           />
@@ -214,6 +263,17 @@ export default function ChatRoomScreen() {
           busy={reserveMut.isPending || statusMut.isPending}
           onPick={confirmWithBand}
           onClose={() => setApproving(false)}
+        />
+      ) : null}
+
+      {intent ? (
+        <ConfirmBookingModal
+          date={intent.date}
+          initialBand={intent.band}
+          customerName={name}
+          busy={reserveMut.isPending || statusMut.isPending}
+          onConfirm={onConfirmBooking}
+          onClose={() => setIntent(null)}
         />
       ) : null}
     </Screen>
