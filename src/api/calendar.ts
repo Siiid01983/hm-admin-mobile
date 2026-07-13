@@ -28,6 +28,43 @@ export const BAND_TIME_LABELS: Record<Band, string> = {
   nt: '18:00〜21:00',
 };
 
+// Band → [startHour, endHour) — for placing blocks on an hourly grid.
+export const BAND_HOURS: Record<Band, { start: number; end: number }> = {
+  am: { start: 9, end: 12 },
+  pm: { start: 12, end: 15 },
+  ev: { start: 15, end: 18 },
+  nt: { start: 18, end: 21 },
+};
+
+// Client mirror of hm-api/_slots.php hm_slot_band_from_notes: a booking's band
+// derived from the packed `time:` line in its notes (keyword or first hour).
+export function bandFromNotes(notes: string | null | undefined): Band | null {
+  if (!notes) return null;
+  const m = notes.match(/^time:\s*(.+)$/m);
+  if (!m) return null;
+  return bandFromTimeString(m[1].trim());
+}
+
+export function bandFromTimeString(t: string): Band | null {
+  if (t.includes('午前')) return 'am';
+  if (t.includes('午後')) return 'pm';
+  if (t.includes('夕方')) return 'ev';
+  if (t.includes('夜間')) return 'nt';
+  if (t.includes('時間指定なし')) return null;
+  const hm = t.match(/(\d{1,2})\s*[:：時]/u);
+  if (hm) return bandForHour(parseInt(hm[1], 10));
+  return null;
+}
+
+// Which band an hour-of-day falls into (grid cell taps). null outside 8–21.
+export function bandForHour(h: number): Band | null {
+  if (h >= 8 && h < 12) return 'am';
+  if (h >= 12 && h < 15) return 'pm';
+  if (h >= 15 && h < 18) return 'ev';
+  if (h >= 18 && h < 21) return 'nt';
+  return null;
+}
+
 // availability.php and block-slot.php use their OWN envelopes (not rest.php's
 // { ok, data, error }) — model each precisely.
 interface AvailabilityResponse {
