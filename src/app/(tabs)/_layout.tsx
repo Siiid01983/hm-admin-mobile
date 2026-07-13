@@ -41,11 +41,15 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: '予約', tabBarIcon: ({ color }) => <TabIcon glyph="📋" color={color} /> }}
+        options={{ title: 'ホーム', tabBarIcon: ({ color }) => <TabIcon glyph="🏠" color={color} /> }}
       />
       <Tabs.Screen
         name="calendar"
         options={{ title: 'カレンダー', tabBarIcon: ({ color }) => <TabIcon glyph="📅" color={color} /> }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{ title: 'チャット', tabBarIcon: ({ color }) => <TabIcon glyph="💬" color={color} /> }}
       />
       <Tabs.Screen
         name="settings"

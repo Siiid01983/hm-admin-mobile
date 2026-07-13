@@ -1,12 +1,19 @@
 import { View, Text } from 'react-native';
 
 // bg + text class per JP status label; unknown → neutral.
+// JP labels + their English code aliases (the data carries both — see
+// api/bookings.ts). Both render identically.
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   新規: { bg: 'bg-amber-100', text: 'text-amber-800' },
+  pending: { bg: 'bg-amber-100', text: 'text-amber-800' },
   確認中: { bg: 'bg-amber-100', text: 'text-amber-800' },
+  checking: { bg: 'bg-amber-100', text: 'text-amber-800' },
   確定: { bg: 'bg-green-100', text: 'text-green-800' },
+  confirmed: { bg: 'bg-green-100', text: 'text-green-800' },
   完了: { bg: 'bg-green-100', text: 'text-green-800' },
+  completed: { bg: 'bg-green-100', text: 'text-green-800' },
   キャンセル: { bg: 'bg-red-100', text: 'text-red-700' },
+  cancelled: { bg: 'bg-red-100', text: 'text-red-700' },
 };
 
 // Statuses an admin can transition a booking TO from the detail screen.

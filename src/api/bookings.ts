@@ -24,6 +24,22 @@ export async function listBookings(limit = 100): Promise<Booking[]> {
   return Array.isArray(body.data) ? body.data : [];
 }
 
+// Bookings whose booking_date starts with the given YYYY-MM-DD (the column is a
+// VARCHAR that may carry a trailing band/time, so match with a prefix `like`).
+export async function listBookingsByDate(date: string): Promise<Booking[]> {
+  const res = await api.post<ApiEnvelope<Booking[]>>('/rest.php', {
+    table: 'bookings',
+    action: 'select',
+    columns: '*',
+    filters: [{ col: 'booking_date', op: 'like', val: `${date}%` }],
+    order: [{ col: 'created_at', ascending: false }],
+    limit: 100,
+  });
+  const body = res.data;
+  if (!body?.ok) throw new Error(restError(body, '予約の取得に失敗しました'));
+  return Array.isArray(body.data) ? body.data : [];
+}
+
 // Fetch a single booking by id. Returns null when not found.
 export async function getBooking(id: string): Promise<Booking | null> {
   const res = await api.post<ApiEnvelope<Booking[]>>('/rest.php', {
@@ -41,15 +57,38 @@ export async function getBooking(id: string): Promise<Booking | null> {
 // Patch a booking's status. rest.php `update` requires a filter (WHERE id=…) and
 // returns SELECT * of the updated row(s). Returns the updated booking.
 export async function updateBookingStatus(id: string, status: string): Promise<Booking> {
+  return updateBooking(id, { status });
+}
+
+export interface BookingPatch {
+  booking_date?: string;
+  notes?: string;
+  status?: string;
+}
+
+// Generic booking field update (booking_date / notes / status). Only these
+// allow-listed columns are accepted by rest.php's bookings table.
+export async function updateBooking(id: string, patch: BookingPatch): Promise<Booking> {
   const res = await api.post<ApiEnvelope<Booking[]>>('/rest.php', {
     table: 'bookings',
     action: 'update',
-    values: { status },
+    values: patch,
     filters: [{ col: 'id', op: 'eq', val: id }],
   });
   const body = res.data;
-  if (!body?.ok) throw new Error(restError(body, 'ステータスの更新に失敗しました'));
+  if (!body?.ok) throw new Error(restError(body, '更新に失敗しました'));
   const row = Array.isArray(body.data) ? body.data[0] : null;
   if (!row) throw new Error('更新後の予約が見つかりません');
   return row;
 }
+
+// Status vocabulary is MIXED in the data: create-booking.php writes English
+// codes ('pending'/'confirmed'/'cancelled'), while the admin UI uses JP labels
+// ('新規'/'確定'/'キャンセル'). bookingService.js maps between them. To be robust,
+// match BOTH forms on read; write JP (consistent with the rest of this app).
+export const PENDING_STATUSES = ['pending', '新規'];
+export const CONFIRMED_STATUSES = ['confirmed', '確定'];
+export const STATUS_APPROVE = '確定';
+export const STATUS_REJECT = 'キャンセル';
+export const isPending = (s: string | null | undefined) => PENDING_STATUSES.includes(String(s ?? ''));
+export const isConfirmed = (s: string | null | undefined) => CONFIRMED_STATUSES.includes(String(s ?? ''));

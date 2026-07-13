@@ -32,6 +32,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
           <Stack.Screen name="booking/[id]" />
+          <Stack.Screen name="chat/[bookingId]" />
+          <Stack.Screen name="calendar/day-view" />
 
         </Stack>
       </SafeAreaProvider>
