@@ -33,7 +33,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "写真を添付するためにフォトライブラリへのアクセスを許可してください。"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
