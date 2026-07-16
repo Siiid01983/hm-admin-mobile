@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Screen from '@/components/Screen';
 import ErrorState from '@/components/ErrorState';
 import ChatBubble from '@/components/ChatBubble';
+import BookingSummaryCard from '@/components/BookingSummaryCard';
 import DefineBookingModal from '@/components/DefineBookingModal';
 import BookingRequestBar from '@/components/BookingRequestBar';
 import ConfirmBookingModal from '@/components/ConfirmBookingModal';
@@ -211,9 +212,12 @@ export default function ChatRoomScreen() {
             renderItem={({ item }) => <ChatBubble msg={item} />}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             ListHeaderComponent={
-              ref ? (
-                <Text className="text-center text-[11px] text-neutral-400 mb-1">予約番号 {ref}</Text>
-              ) : null
+              <>
+                {booking.data ? <BookingSummaryCard booking={booking.data} /> : null}
+                {ref ? (
+                  <Text className="text-center text-[11px] text-neutral-400 mb-1">予約番号 {ref}</Text>
+                ) : null}
+              </>
             }
             ListEmptyComponent={
               <Text className="text-center text-neutral-400 mt-10">まだメッセージはありません。</Text>
